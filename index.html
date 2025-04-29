@@ -1,0 +1,541 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bit Map Analyzer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+    <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
+        <h1 class="text-2xl font-bold mb-6 text-center">Bit Map Analyzer</h1>
+        
+        <!-- Input for Hex String -->
+        <div class="mb-4">
+            <label for="hexInput" class="block text-sm font-medium text-gray-700">Hex String</label>
+            <input type="text" id="hexInput" class="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter hex string">
+            <p id="hexError" class="text-red-500 text-sm mt-1 hidden">Invalid hex string</p>
+        </div>
+        
+        <!-- Input for Bit Position -->
+        <div class="mb-4">
+            <label for="bitPosition" class="block text-sm font-medium text-gray-700">Bit Position</label>
+            <input type="number" id="bitPosition" class="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter bit position" min="1">
+            <p id="bitError" class="text-red-500 text-sm mt-1 hidden">Please enter a positive integer</p>
+        </div>
+        
+        <!-- Dropdown for Bitmap Selection -->
+        <div class="mb-4">
+            <label for="bitmapSelect" class="block text-sm font-medium text-gray-700">Bitmap Type</label>
+            <select id="bitmapSelect" class="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="none">None</option>
+                <option value="srs">SRS Capability Bit-Map</option>
+                <option value="src">SRC Capability Bit-Map</option>
+                <option value="policy">Flag Mask Of Policy Change</option>
+            </select>
+        </div>
+        
+        <!-- Result Display -->
+        <div id="result" class="mt-6 p-4 bg-blue-100 rounded-md hidden">
+            <p id="fullBinaryString" class="text-sm mt-2 overflow-auto whitespace-nowrap"></p>
+            <br>
+            <p id="bitValue" class="text-sm font-medium mt-2"></p>
+            <br>
+            <p id="definition" class="text-sm mt-2"></p>
+            <p id="comment" class="text-sm mt-2"></p>
+        </div>
+    </div>
+
+    <script>
+        // Embedded CSV data
+        const srsData = [
+            { Bit: "1", Definition: "File transfer", Comment: "Should be ON for SRS has the capability to do file transfer. No matter if the backend allow the SRS to use it or not." },
+            { Bit: "2", Definition: "1-to-many streaming", Comment: "Should be ON for SRS has the capability to do 1-to-many streaming. No matter if the backend allow the SRS to use it or not." },
+            { Bit: "3", Definition: "Local Relay", Comment: "Should be ON for SRS has set up a Local Relay. No matter if the backend allow the SRS to use it or not." },
+            { Bit: "4", Definition: "MDS GW", Comment: "Should be ON for SRS has MDS gateway interfaces. No matter if the backend allow the SRS to use it or not." },
+            { Bit: "5", Definition: "Copy & Paste", Comment: "Should be ON if copy & paste is supported by the streamer." },
+            { Bit: "6", Definition: "Remote Wake", Comment: "[Non Android streamer] Should be ON if remote wake is supported by the streamer. (The streamer can be used to wake up other streamers.) [Android] Should be ON if the Android streamer supports to be waked up via FCM (the 61th bit)." },
+            { Bit: "7", Definition: "Auto update", Comment: "Should be ON if the streamer supports the Fulong V3 or above API to react to the auto_update attribute in the commands section." },
+            { Bit: "8", Definition: "Force Disconnect", Comment: "Should be ON if the streamer supports the “force_disconn” command definded in the Fulong V3 session API or above to disconnect the current connection immediately." },
+            { Bit: "9", Definition: "On-Demand Support", Comment: "Should be ON if the streamer is an SRS that supports the On-Demand support mode." },
+            { Bit: "10", Definition: "Remote Print", Comment: "Should be ON if the streamer supports the “remote_print” command defined in the Fulong V3 session API or above." },
+            { Bit: "11", Definition: "Force Logoff", Comment: "Should be ON if the streamer supports the Fulong V3 or above API to react to the force-logoff attribute in the commands section." },
+            { Bit: "12", Definition: "Chat", Comment: "Should be ON if the streamer supports the chat feature." },
+            { Bit: "13", Definition: "Remote Reboot - Restart", Comment: "Should be ON if Remote Reboot - Restart is supported by the streamer." },
+            { Bit: "14", Definition: "Remote Reboot – Reboot", Comment: "Should be ON if Remote Reboot –Reboot is supported by the streamer." },
+            { Bit: "15", Definition: "Remote Reboot – Reboot (Safe mode w/ network)", Comment: "Should be ON if Remote Reboot –Reboot (Safe mode w/ network) is supported by the streamer." },
+            { Bit: "16", Definition: "Remote Reboot – Shutdown", Comment: "Should be ON if Remote Reboot –Shutdown is supported by the streamer." },
+            { Bit: "17", Definition: "Remote Reboot – OS Log Off", Comment: "Should be ON if Remote Reboot –OS Log Off is supported by the streamer." },
+            { Bit: "18", Definition: "1-to-Many Reboot Action", Comment: "Should be ON if the action-triggered reboot is supported by the streamer." },
+            { Bit: "19", Definition: "Upload Log Files", Comment: "Should be ON if Upload-Log-Files is supported by the streamer." },
+            { Bit: "20", Definition: "Terminal Session", Comment: "Should be ON if Terminal Session is supported by the streamer." },
+            { Bit: "21", Definition: "Multiple Monitor", Comment: "Should be ON if Multiple Monitor is supported by the streamer." },
+            { Bit: "22", Definition: "Multiple Remote Sessions", Comment: "Should be ON if the streamer can manage multiple remote sessions. This can be used for on-demand relay resource allocation for multiple remote sessions, standalone file transfer and chat channel." },
+            { Bit: "23", Definition: "Off-session file Session", Comment: "Should be ON if the streamer can manage the off-session file session. This can be used for on-demand relay resource allocation for multiple remote sessions, standalone file transfer and chat channel." },
+            { Bit: "24", Definition: "Off-session chat Session", Comment: "Should be ON if the streamer can manage the off-session chat session. This can be used for on-demand relay resource allocation for multiple remote sessions, standalone file transfer and chat channel." },
+            { Bit: "25", Definition: "Report Inventory", Comment: "Should be ON if the streamer can support the inventory data report." },
+            { Bit: "26", Definition: "System Update Management", Comment: "Should be ON if the streamer can do System update status report and setup." },
+            { Bit: "27", Definition: "System Alert", Comment: "Should be ON if the streamer can support system alerts." },
+            { Bit: "28", Definition: "Remote Command", Comment: "Should be ON if the streamer can support the Remote Command." },
+            { Bit: "29", Definition: "Report Idle time", Comment: "Should be ON if the streamer can report how long a computer has been in an idle status to the backend." },
+            { Bit: "30", Definition: "Report Event Log", Comment: "Should be ON if the streamer can support the event log report." },
+            { Bit: "31", Definition: "True Multiple Monitor", Comment: "Should be ON if True Multiple Monitor is supported by the streamer." },
+            { Bit: "32", Definition: "Dynamic Custom HTTP Header", Comment: "Should be ON if Dynamic Custom HTTP Header is supported by the streamer." },
+            { Bit: "33", Definition: "Bitdefender", Comment: "Should be ON if Bitdefender integration is supported by the streamer." },
+            { Bit: "34", Definition: "1-to-Many Scheduled Reboot", Comment: "Should be ON if Scheduled Reboot is supported by the streamer." },
+            { Bit: "35", Definition: "Session Recording", Comment: "Should be ON if the SRS can do session recording." },
+            { Bit: "36", Definition: "1-to-Many Scheduled Updates", Comment: "Should be ON if the SRS supports the scheduled Windows updates." },
+            { Bit: "37", Definition: "Antivirus Info", Comment: "Should be ON if the SRS supports the antivirus info reporting." },
+            { Bit: "38", Definition: "JWT Access Token", Comment: "Should be ON if the SRS supports the JWT access token rotation." },
+            { Bit: "39", Definition: "1-to-Many Updates Action", Comment: "Should be ON if the action-triggered Windows Updates is supported by the streamer." },
+            { Bit: "40", Definition: "1-to-Many Remote Command Action", Comment: "Should be ON if the action-triggered 1-to-Many Remote Command is supported by the streamer." },
+            { Bit: "41", Definition: "1-to-Many BAT/Executable File (Windows) Action", Comment: "Should be ON if the action-triggered 1-to-Many BAT/Executable (Windows) is supported by the streamer." },
+            { Bit: "42", Definition: "1-to-Many Remote Command Action for Mac", Comment: "Should be ON if the action-triggered 1-to-Many Remote Command is supported by the streamer." },
+            { Bit: "43", Definition: "1-to-Many Script/Executable File (Mac) Action", Comment: "Should be ON if the action-triggered 1-to-Many Script/Executable (Mac) is supported by the streamer." },
+            { Bit: "44", Definition: "1-to-Many MSI File (Windows) Action", Comment: "Should be ON if the action-triggered 1-to-Many MSI File (Windows) is supported by the streamer." },
+            { Bit: "45", Definition: "Scheduled 1-to-Many Remote Command (Windows)", Comment: "Should be ON if the scheduled 1-to-Many Remote Command (Windows) is supported by the streamer." },
+            { Bit: "46", Definition: "Scheduled 1-to-Many BAT/Executable File (Windows)", Comment: "Should be ON if the scheduled 1-to-Many BAT/Executable (Windows) is supported by the streamer." },
+            { Bit: "47", Definition: "Scheduled 1-to-Many Remote Command (Mac)", Comment: "Should be ON if the scheduled 1-to-Many Remote Command (Mac) is supported by the streamer." },
+            { Bit: "48", Definition: "Scheduled 1-to-Many Script/Executable File (Mac)", Comment: "Should be ON if the scheduled 1-to-Many Script/Executable (Mac) is supported by the streamer." },
+            { Bit: "49", Definition: "Scheduled 1-to-Many MSI File (Windows)", Comment: "Should be ON if the scheduled 1-to-Many MSI File (Windows) is supported by the streamer." },
+            { Bit: "50", Definition: "1-to-Many Credential Check", Comment: "Should be ON if the 1-to-Many credential check is supported by the streamer." },
+            { Bit: "51", Definition: "Diagnosis", Comment: "Should be ON if the diagnosis is supported by the streamer." },
+            { Bit: "52", Definition: "1-to-Many APK File (Windows) Action", Comment: "Should be ON if the action-triggered 1-to-Many APK (Android) is supported by the streamer." },
+            { Bit: "53", Definition: "Scheduled 1-to-Many APK File (Android)", Comment: "Should be ON if the scheduled 1-to-Many APK File (Android) is supported by the streamer." },
+            { Bit: "54", Definition: "1-to-Many File Dispatch (Windows) Action", Comment: "Should be ON if the action-triggered 1-to-Many File Dispatch is supported by the Windows streamer." },
+            { Bit: "55", Definition: "1-to-Many File Dispatch (Mac) Action", Comment: "Should be ON if the action-triggered 1-to-Many File Dispatch is supported by the Mac streaming." },
+            { Bit: "56", Definition: "1-to-Many File Dispatch (Android) Action", Comment: "Should be ON if the action-triggered 1-to-Many File Dispatch is supported by the Android streamer." },
+            { Bit: "57", Definition: "Scheduled 1-to-Many File Dispatch (Windows)", Comment: "Should be ON if the scheduled 1-to-Many File Dispatch is supported by the Windows streamer." },
+            { Bit: "58", Definition: "Scheduled 1-to-Many File Dispatch (Mac)", Comment: "Should be ON if the scheduled 1-to-Many File Dispatch is supported by the Mac streamer." },
+            { Bit: "59", Definition: "Scheduled 1-to-Many File Dispatch (Android)", Comment: "Should be ON if the scheduled 1-to-Many File Dispatch is supported by the Android streamer." },
+            { Bit: "60", Definition: "Session duration control", Comment: "Should be ON if the session duration control is supported by the streamer." },
+            { Bit: "61", Definition: "Google Firebase Cloud Messaging", Comment: "Should be ON if the Google FCM is supported by the streamer." },
+            { Bit: "62", Definition: "Infrastructure Generation Control", Comment: "Should be ON if the infrastructure generation control is supported." },
+            { Bit: "63", Definition: "Customized Token Access", Comment: "Should be ON if the customized token access is supported." },
+            { Bit: "64", Definition: "Reserved", Comment: "" },
+            { Bit: "65", Definition: "Hex String Capability", Comment: "Should be ON if the SRS accepts the capability info in the Hex String format." },
+            { Bit: "66", Definition: "Alert Throttling", Comment: "Should be ON if the alert throttling is supported." },
+            { Bit: "67", Definition: "Remote Microphone", Comment: "Should be ON if the Remote Microphone is supported." },
+            { Bit: "68", Definition: "Device HID", Comment: "Should be ON if the Device HID is supported." },
+            { Bit: "69", Definition: "Device Printer", Comment: "Should be ON if the Device Printer is supported." },
+            { Bit: "70", Definition: "Device Card Reader", Comment: "Should be ON if the Device Card Reader is supported." },
+            { Bit: "71", Definition: "Chat Transcript", Comment: "Should be ON if the Chat Transcript is supported." },
+            { Bit: "72", Definition: "RDP Session", Comment: "Should be ON if the RDP Session is supported." },
+            { Bit: "73", Definition: "Messaging Framework", Comment: "Should be ON if the Messaging Framework is supported." },
+            { Bit: "74", Definition: "Splashtop Update (Cloud)", Comment: "Should be ON if the Splashtop Update (Cloud) is supported." },
+            { Bit: "75", Definition: "Service Desk", Comment: "Should be ON if the Service Desk is supported." },
+            { Bit: "76", Definition: "V-score Blank Password", Comment: "Should be ON if the V-score Blank Password tracking is supported." },
+            { Bit: "77", Definition: "V-score Inactive Account", Comment: "Should be ON if the V-score Inactive Account tracking is supported." },
+            { Bit: "78", Definition: "V-score Antivirus Installation", Comment: "Should be ON if the V-score Antivirus Installation tracking is supported." },
+            { Bit: "79", Definition: "Session Notification", Comment: "Should be ON if the Session Notification is supported." },
+            { Bit: "80", Definition: "Aggregate Session Permission (Remote)", Comment: "Should be ON if the aggregate session permission control (Remote) is supported." },
+            { Bit: "81", Definition: "Keystroke Control", Comment: "Should be ON if the keystroke control is supported." },
+            { Bit: "82", Definition: "Service Desk – SOS Call", Comment: "Should be ON if the Service Desk –Calling Card is supported." },
+            { Bit: "83", Definition: "In-session Voice Call", Comment: "Should be ON if the In-session Voice Call is supported." },
+            { Bit: "84", Definition: "Relay Zone", Comment: "Should be ON if the relay zone is supported." },
+            { Bit: "85", Definition: "Directional File Transfer", Comment: "Should be ON if the Directional File Transfer is supported." },
+            { Bit: "86", Definition: "Directional Copy&Paste", Comment: "Should be ON if the Directional Copy&Paste is supported." },
+            { Bit: "87", Definition: "Reset Relay", Comment: "Should be ON if the Reset Relay is supported." },
+            { Bit: "88", Definition: "Aggregate Session Permission (File)", Comment: "Should be ON if the aggregate session permission control (File) is supported." },
+            { Bit: "89", Definition: "Service Desk – PSA", Comment: "Should be ON if the Service Desk –PSA is supported." },
+            { Bit: "90", Definition: "Preference Policy", Comment: "Should be ON if the preference policy control is supported." },
+            { Bit: "91", Definition: "Relay Recording", Comment: "Should be ON if the relay recording is supported." },
+            { Bit: "92", Definition: "(deprecated)", Comment: "Should be ON if the relay recording ASP is supported." },
+            { Bit: "93", Definition: "Secure Data Transfer and Validation", Comment: "Deprecated. Relay Recording (ASP)" },
+            { Bit: "94", Definition: "Confirm Scheduled Reboot and Windows Update", Comment: "Should be ON if the 1-to-Many confirmation for scheduled reboot/Windows update is supported." },
+            { Bit: "95", Definition: "QUIC", Comment: "Should be ON if QUIC is supported by the streamer." },
+            { Bit: "96", Definition: "Support Session History&Chat", Comment: "Should be ON if the Support Session History&Chat is supported." },
+            { Bit: "97", Definition: "BitDefender V2", Comment: "Should be ON if Bitdefender integration V2 is supported by the streamer." },
+            { Bit: "98", Definition: "VNC Session", Comment: "Should be ON if the VNC Session is supported by the streamer." },
+            { Bit: "99", Definition: "Premium Tool Session", Comment: "Should be ON if the streamer can establish premium tool sessions." },
+            { Bit: "100", Definition: "Premium Tool – Task Manager", Comment: "Should be ON if the Premium Tool – Task Manager is supported by the streamer." },
+            { Bit: "101", Definition: "Premium Tool – Service Manager", Comment: "Should be ON if the Premium Tool –Service Manager is supported by the streamer." },
+            { Bit: "102", Definition: "Premium Tool – Registry Editor", Comment: "Should be ON if the Premium Tool – Registry Editor is supported by the streamer." },
+            { Bit: "103", Definition: "Premium Tool – Device Manager", Comment: "Should be ON if the Premium Tool –Device Manager is supported by the streamer." },
+            { Bit: "104", Definition: "Premium Tool – Reserved", Comment: "Should be ON if the Premium Tool – Reserved is supported by the streamer." },
+            { Bit: "105", Definition: "Premium Tool – Reserved", Comment: "Should be ON if the Premium Tool – Reserved is supported by the streamer." },
+            { Bit: "106", Definition: "Premium Tool – Reserved", Comment: "Should be ON if the Premium Tool – Reserved is supported by the streamer." },
+            { Bit: "107", Definition: "Premium Tool – Reserved", Comment: "Should be ON if the Premium Tool – Reserved is supported by the streamer." },
+            { Bit: "108", Definition: "1-to-Many File Dispatch (Linux) Action", Comment: "Should be ON if the action-triggered 1-to-Many File Dispatch is supported by the Linux streamer." },
+            { Bit: "109", Definition: "1-to-Many Script/Executable File (Linux) Action", Comment: "Should be ON if the action-triggered 1-to-Many Script/Executable File is supported by the Linux streamer." },
+            { Bit: "110", Definition: "RDS Session", Comment: "Should be ON if the RDS Session is supported." },
+            { Bit: "111", Definition: "Scheduled 1-to-Many File Dispatch (Linux)", Comment: "Should be ON if the scheduled 1-to-Many File Dispatch is supported by the Linux streamer." },
+            { Bit: "112", Definition: "Scheduled 1-to-Many Executable File (Linux)", Comment: "Should be ON if the scheduled 1-to-Many Executable File is supported by the Linux streamer." },
+            { Bit: "113", Definition: "Remote Control", Comment: "Should be ON if the remote control (keyboard/mouse) is supported by the streamer." },
+            { Bit: "114", Definition: "User-added Device", Comment: "Should be ON if the Device-redirection for User-added Device is supported." },
+            { Bit: "115", Definition: "Relay Recording (ASP)", Comment: "Should be ON if the relay recording ASP is supported." },
+            { Bit: "116", Definition: "WACOM Integration", Comment: "Should be ON if the device_redirect_wacom is supported." },
+            { Bit: "117", Definition: "Service Desk – WebForm", Comment: "Should be ON if the Service Desk –WebForm is supported." },
+            { Bit: "118", Definition: "Smart Action (for Alerts)", Comment: "Should be ON if the Smart Action for Alerts is supported." },
+            { Bit: "119", Definition: "SSH Session", Comment: "Should be ON if the SSH Session is supported." },
+            { Bit: "120", Definition: "One-time data encryption", Comment: "Should be ON if the one-time data encryption is supported." },
+            { Bit: "121", Definition: "1-to-Many Remote Command Action for Android", Comment: "Should be ON if the action-triggered 1-to-Many Remote Command for Android is supported by the streamer." },
+            { Bit: "122", Definition: "Scheduled 1-to-Many Remote Command (Android)", Comment: "Should be ON if the scheduled 1-to-Many Remote Command (Android) is supported by the streamer." },
+            { Bit: "123", Definition: "ServiceDesk Premium Tool Session", Comment: "Should be ON if the ServiceDesk Premium Tool Session is supported by the streamer." },
+            { Bit: "124", Definition: "ServiceDesk Premium Tool – Task Manager", Comment: "Should be ON if the ServiceDesk Premium Tool – Task Manager is supported by the streamer." },
+            { Bit: "125", Definition: "ServiceDesk Premium Tool – Service Manager", Comment: "Should be ON if the ServiceDesk Premium Tool – Registry Editor is supported by the streamer." },
+            { Bit: "126", Definition: "ServiceDesk Premium Tool – Registry Editor", Comment: "Should be ON if the ServiceDesk Premium Tool – Device Manager is supported by the streamer." },
+            { Bit: "127", Definition: "ServiceDesk Premium Tool – Device Manager", Comment: "Should be ON if the ServiceDesk Premium Tool Session is supported by the streamer." },
+            { Bit: "128", Definition: "ServiceDesk Premium Tool – Reserved", Comment: "Should be ON if the ServiceDesk Premium Tool – Reserved is supported by the streamer." },
+            { Bit: "129", Definition: "ServiceDesk Premium Tool – Reserved", Comment: "Should be ON if the ServiceDesk Premium Tool – Reserved is supported by the streamer." },
+            { Bit: "130", Definition: "ServiceDesk Premium Tool – Reserved", Comment: "Should be ON if the ServiceDesk Premium Tool – Reserved is supported by the streamer." },
+            { Bit: "131", Definition: "ServiceDesk Premium Tool – Reserved", Comment: "Should be ON if the ServiceDesk Premium Tool – Reserved is supported by the streamer." },
+            { Bit: "132", Definition: "WebSocket Relay Enforcement", Comment: "Should be ON if the WebSocket Relay Enforcement is supported by the streamer." },
+            { Bit: "133", Definition: "ServiceDesk Survey", Comment: "Should be ON if the ServiceDesk Survey is supported by the streamer." },
+            { Bit: "134", Definition: "Users on multiple STB teams", Comment: "Should be ON if the users on multiple STB teams is supported by the streamer." },
+            { Bit: "135", Definition: "Redeployment", Comment: "Should be ON if the redeployment is supported by the streamer." },
+            { Bit: "136", Definition: "Device Mass Storage", Comment: "Should be ON if the Device Mass Storage is supported." },
+            { Bit: "137", Definition: "ServiceDesk Superuser Elevation", Comment: "Should be ON if the ServiceDesk Superuser Elevation is supported." },
+            { Bit: "138", Definition: "Session Disconnect", Comment: "Should be ON if the Session Disconnect is supported." },
+            { Bit: "139", Definition: "1-to-Many Mac Updates Action", Comment: "Should be ON if the action-triggered Mac Updates is supported by the streamer." },
+            { Bit: "140", Definition: "1-to-Many Scheduled Mac Updates", Comment: "Should be ON if the SRS supports the scheduled Mac updates." },
+            { Bit: "141", Definition: "Windows SW Patch Opportunity", Comment: "Should be ON if the SRS supports the Windows SW Patch Opportunity. (for 3740 and later)" },
+            { Bit: "142", Definition: "Mac SW Patch Opportunity", Comment: "Should be ON if the SRS supports the Mac SW Patch Opportunity. (for 3740 and later)" },
+            { Bit: "143", Definition: "Windows OS Update Opportunity", Comment: "Should be ON if the SRS supports the Windows OS Update Opportunity. (for 3740 and later)" },
+            { Bit: "144", Definition: "Mac OS Update Opportunity", Comment: "Should be ON if the SRS supports the Mac OS Update Opportunity. (for 3740 and later)" },
+            { Bit: "145", Definition: "Device Posture Check – Osquery for Windows", Comment: "Should be ON if the Windows Device Posture Check via osquery is supported by the streamer." },
+            { Bit: "146", Definition: "Device Posture Check – Osquery for Mac", Comment: "Should be ON if the Mac Device Posture Check via osquery is supported by the streamer." },
+            { Bit: "147", Definition: "Foxpass Secure Wi-Fi (Windows)", Comment: "Should be ON if the EMM Foxpass Secure Wi-Fi Integration for Window is supported by the streamer." },
+            { Bit: "148", Definition: "Foxpass Secure Wi-Fi (Mac)", Comment: "Should be ON if the EMM Foxpass Secure Wi-Fi Integration for Mac is supported by the streamer." },
+            { Bit: "149", Definition: "Report the QUIC session type", Comment: "Should be ON if the QUIC session type is supported." },
+            { Bit: "153", Definition: "EMM Policy Framework for Windows", Comment: "Should be ON if the EMM Policy Framework for Windows is supported. *Mac 3700 uses this one instead of 161th." },
+            { Bit: "154", Definition: "EMM Streamer Policy for Windows", Comment: "Should be ON if the EMM Streamer Policy for Windows is supported. *Mac 3700 uses this one instead of 162th." },
+            { Bit: "155", Definition: "EMM OS Policy and Management for Windows", Comment: "Should be ON if the EMM OS Policy and Management for Windows is supported." },
+            { Bit: "156", Definition: "EMM SW Patch Policy and Management for Windows", Comment: "Should be ON if the EMM SW Patch Policy and Management for Windows is supported." },
+            { Bit: "157", Definition: "EMM Antivirus Policy and Management (BD2) for Windows", Comment: "Should be ON if the EMM Antivirus Policy and Management for Windows is supported." },
+            { Bit: "158", Definition: "EMM Alert Policy and Management for Windows", Comment: "Should be ON if the EMM Alert Policy and Management for Windows is supported." },
+            { Bit: "159", Definition: "EMM Scripting Policy and Management for Windows", Comment: "Should be ON if the EMM Scripting Policy and Management for Windows is supported." },
+            { Bit: "160", Definition: "EMM XXX Policy for Windows (Reserved)", Comment: "" },
+            { Bit: "161", Definition: "EMM Policy Framework for Mac", Comment: "Should be ON if the EMM Policy Framework for Mac is supported. *Mac 3700 uses 153th instead of this one." },
+            { Bit: "162", Definition: "EMM Streamer Policy for Mac", Comment: "Should be ON if the EMM Streamer Policy for Mac is supported. *Mac 3700 uses 154th instead of this one." },
+            { Bit: "163", Definition: "EMM OS Patch Policy and Management for Mac", Comment: "Should be ON if the EMM OS Patch Policy and Management for Mac is supported." },
+            { Bit: "164", Definition: "EMM SW Patch Policy and Management for Mac", Comment: "Should be ON if the EMM SW Patch Policy and Management for Mac is supported." },
+            { Bit: "165", Definition: "EMM Antivirus Policy and Management (BD2) for Mac", Comment: "Should be ON if the EMM Antivirus Policy and Management for Mac is supported." },
+            { Bit: "166", Definition: "EMM Alert Policy and Management for Mac", Comment: "Should be ON if the EMM Alert Policy and Management for Mac is supported." },
+            { Bit: "167", Definition: "EMM Scripting Policy and Management for Mac", Comment: "Should be ON if the EMM Scripting Policy and Management for Mac is supported." },
+            { Bit: "168", Definition: "EMM XXX Policy for Mac (Reserved)", Comment: "" },
+            { Bit: "169", Definition: "EMM Policy Framework for Android", Comment: "Should be ON if the EMM Policy Framework for Android is supported." },
+            { Bit: "170", Definition: "EMM Streamer Policy for Android", Comment: "Should be ON if the EMM Streamer Policy for Android is supported." },
+            { Bit: "171", Definition: "EMM XXX Policy for Android (Reserved)", Comment: "" },
+            { Bit: "172", Definition: "EMM XXX Policy for Android (Reserved)", Comment: "" },
+            { Bit: "173", Definition: "EMM XXX Policy for Android (Reserved)", Comment: "" },
+            { Bit: "174", Definition: "EMM XXX Policy for Android (Reserved)", Comment: "" },
+            { Bit: "175", Definition: "EMM XXX Policy for Android (Reserved)", Comment: "" },
+            { Bit: "176", Definition: "EMM XXX Policy for Android (Reserved)", Comment: "" }
+        ];
+
+        const srcData = [
+            { Bit: "1", Definition: "Two-step verification (via security code)", Comment: "If the SRC can proceed a 2SV via authenticator apps (or SMS) on mobile devices." },
+            { Bit: "2", Definition: "Two-step verification (Reserved)", Comment: "" },
+            { Bit: "3", Definition: "Share screen", Comment: "Should be ON if Share Screen is supported by the client." },
+            { Bit: "4", Definition: "Mobile device", Comment: "Allowed to connect to streamers running on mobile devices (iOS/iPad/iPhone/android)" },
+            { Bit: "5", Definition: "Multiple relay sessions", Comment: "Should be ON if the SRC can negotiate with streamers which support multiple relay session management." },
+            { Bit: "6", Definition: "Off-session File", Comment: "Should be ON if the SRC can negotiate with streamers for off-session file transfer." },
+            { Bit: "7", Definition: "Off-session Chat", Comment: "Should be ON if the SRC can negotiate with streamers for off-session chat." },
+            { Bit: "8", Definition: "Remote Command", Comment: "Should be ON if the SRC can negotiate with streamers for Remote Command." },
+            { Bit: "9", Definition: "Session Recording", Comment: "Should be ON if the SRC can do session recording." },
+            { Bit: "10", Definition: "Computer list refresh", Comment: "Should be ON if the SRC can handle the computer list refresh command." },
+            { Bit: "11", Definition: "Upload Logs", Comment: "Should be ON if the SRC supports log file upload." },
+            { Bit: "12", Definition: "JWT Access Token", Comment: "Should be ON if the SRC supports the JWT access token rotation." },
+            { Bit: "13", Definition: "Websocket", Comment: "Should be ON if the SRC supports the websocket-based interaction." },
+            { Bit: "14", Definition: "Compact List", Comment: "Should be ON if the SRC supports the compact mode for computer list rendering." },
+            { Bit: "15", Definition: "Policy SRC", Comment: "Should be ON if the SRC will call the policy_src API call." },
+            { Bit: "16", Definition: "Simple Message Center", Comment: "Should be ON if the SRC supports simple message center." },
+            { Bit: "17", Definition: "SSO (SAML 2.0)", Comment: "Should be ON if the SRC supports SAML 2.0 based SSO login." },
+            { Bit: "18", Definition: "Session Duration Control", Comment: "Should be ON if the SRC supports the session duration control." },
+            { Bit: "19", Definition: "User Preference", Comment: "Should be ON if the SRC supports user preference. (Not fully covered is fine.)" },
+            { Bit: "20", Definition: "Infrastructure Generation Control", Comment: "Should be ON if the infrastructure generation control is supported." },
+            { Bit: "21", Definition: "Customized Token Access", Comment: "Should be ON if the SRS knows how to use the customized token access." },
+            { Bit: "22", Definition: "Hex String Capability", Comment: "Should be ON if the SRC accepts the capability info in the Hex String format." },
+            { Bit: "23", Definition: "Remote Microphone", Comment: "Should be ON if the Remote Microphone is supported." },
+            { Bit: "24", Definition: "Device HID", Comment: "Should be ON if the Device HID is supported." },
+            { Bit: "25", Definition: "Device Printer", Comment: "Should be ON if the Device Printer is supported." },
+            { Bit: "26", Definition: "Device Card Reader", Comment: "Should be ON if the Device Card Reader is supported." },
+            { Bit: "27", Definition: "Connection Shortcut", Comment: "Should be ON if the Connection Shortcut is supported." },
+            { Bit: "28", Definition: "Session Note", Comment: "Should be ON if the Read/(Take) Session Note is supported." },
+            { Bit: "29", Definition: "Connection Pool (Computer Group-based)", Comment: "Should be ON if the computer group based connection pool is supported." },
+            { Bit: "30", Definition: "Connection Pool (Access Schedule based)", Comment: "Should be ON if the access schedule based connection pool is supported." },
+            { Bit: "31", Definition: "Questionnaire (Remote Session)", Comment: "Should be ON if the questionnaire for remote session is supported." },
+            { Bit: "32", Definition: "Unlink SRC", Comment: "Should be ON if the unlink SRC is supported." },
+            { Bit: "33", Definition: "RDP Session", Comment: "Should be ON if the RDP Session is supported." },
+            { Bit: "34", Definition: "Messaging Framework (inbox)", Comment: "Should be ON if the Messaging Framework (inbox) is supported." },
+            { Bit: "35", Definition: "Waterfall Control", Comment: "Should be ON if the Watefall Control is supported." },
+            { Bit: "36", Definition: "Watermark", Comment: "Should be ON if the Watermark is supported." },
+            { Bit: "37", Definition: "Splashtop Update (Cloud)", Comment: "Should be ON if the Splashtop Update (Cloud) is supported." },
+            { Bit: "38", Definition: "SOS AR", Comment: "Should be ON if the SOS AR is supported." },
+            { Bit: "39", Definition: "Service Desk", Comment: "Should be ON if the Service Desk is supported." },
+            { Bit: "40", Definition: "Vulnerability Score", Comment: "Should be ON if the Vulnerability is supported." },
+            { Bit: "41", Definition: "Session Notification", Comment: "Should be ON if the Session Notification is supported." },
+            { Bit: "42", Definition: "Aggregate Session Permission (Remote)", Comment: "Should be ON if the aggregate session permission control (Remote) is supported." },
+            { Bit: "43", Definition: "Keystroke Control", Comment: "Should be ON if the keystroke control is supported." },
+            { Bit: "44", Definition: "Service Desk – Incremental Update", Comment: "Should be ON if the Service Desk –Incremental Update is supported." },
+            { Bit: "45", Definition: "Service Desk – Calling Card", Comment: "Should be ON if the Service Desk –Calling Card is supported." },
+            { Bit: "46", Definition: "In-session Voice Call", Comment: "Should be ON if the In-session Voice Call is supported." },
+            { Bit: "47", Definition: "Directional File Transfer", Comment: "Should be ON if the Directional File Transfer is supported." },
+            { Bit: "48", Definition: "Directional Copy&Paste", Comment: "Should be ON if the Directional Copy&Paste is supported." },
+            { Bit: "49", Definition: "Aggregate Session Permission (File)", Comment: "Should be ON if the aggregate session permission control (File) is supported." },
+            { Bit: "50", Definition: "Service Desk – PSA", Comment: "Should be ON if the Service Desk –PSA is supported." },
+            { Bit: "51", Definition: "Dynamic SRC Theme", Comment: "Should be ON if the Dynamic SRC Theme is supported." },
+            { Bit: "52", Definition: "PWM Integration", Comment: "Should be ON if the PWM integration is supported." },
+            { Bit: "53", Definition: "Relay Recording (ASP)", Comment: "Should be ON if the relay recording ASP is supported." },
+            { Bit: "54", Definition: "Secure Data Transfer and Validation", Comment: "Should be ON if the Secure Data Transfer and Validation is supported." },
+            { Bit: "55", Definition: "Support Session History&Chat", Comment: "Should be ON if the Support Session History&Chat is supported." },
+            { Bit: "56", Definition: "VNC Session", Comment: "Should be ON if the VNC Streamer connection is supported." },
+            { Bit: "57", Definition: "Premium Tool Session", Comment: "Should be ON if the Premium Tool Session is supported." },
+            { Bit: "58", Definition: "Premium Tool – Task Manager", Comment: "Should be ON if the Premium Tool – Task Manager OPTION is supported by the client." },
+            { Bit: "59", Definition: "Premium Tool – Service Manager", Comment: "Should be ON if the Premium Tool – Service Manager OPTION is supported by the client." },
+            { Bit: "60", Definition: "Premium Tool – Registry Editor", Comment: "Should be ON if the Premium Tool – Registry Editor OPTION is supported by the client." },
+            { Bit: "61", Definition: "Premium Tool – Device Manager", Comment: "Should be ON if the Premium Tool – Device Manager OPTION is supported by the client." },
+            { Bit: "62", Definition: "Premium Tool – Reserved", Comment: "Should be ON if the Premium Tool – Reserved OPTION is supported by the client." },
+            { Bit: "63", Definition: "Premium Tool – Reserved", Comment: "Should be ON if the Premium Tool – Reserved OPTION is supported by the client." },
+            { Bit: "64", Definition: "Premium Tool – Reserved", Comment: "Should be ON if the Premium Tool – Reserved OPTION is supported by the client." },
+            { Bit: "65", Definition: "Premium Tool – Reserved", Comment: "Should be ON if the Premium Tool – Reserved OPTION is supported by the client." },
+            { Bit: "66", Definition: "RDS Session", Comment: "Should be ON if the RDS Session is supported." },
+            { Bit: "67", Definition: "Remote Control", Comment: "Should be ON if the remote control (keyboard/mouse) is supported." },
+            { Bit: "68", Definition: "User-added Device", Comment: "Should be ON if the Device-redirection for User-added Device is supported." },
+            { Bit: "69", Definition: "QUIC", Comment: "Should be ON if the quic-based remote session is supported." },
+            { Bit: "70", Definition: "WACOM Integration", Comment: "Should be ON if the device_redirect_wacom is supported." },
+            { Bit: "71", Definition: "Service Desk – WebForm", Comment: "Should be ON if the Service Desk –WebForm is supported." },
+            { Bit: "72", Definition: "SSH Session", Comment: "Should be ON if the SSH Session is supported." },
+            { Bit: "73", Definition: "Computer List w/o Share Token", Comment: "Should be ON if the no share token computer list (compact mode) is supported." },
+            { Bit: "74", Definition: "Messaging Framework (pop-up)", Comment: "Should be ON if the Messaging Framework (pop-up) is supported." },
+            { Bit: "75", Definition: "Messaging Framework (banner)", Comment: "Should be ON if the Messaging Framework (banner) is supported." },
+            { Bit: "76", Definition: "One-time data encryption", Comment: "Should be ON if the one-time data encryption is supported." },
+            { Bit: "77", Definition: "ServiceDesk Premium Tool", Comment: "Should be ON if the ServiceDesk Premium Tool is supported." },
+            { Bit: "78", Definition: "ServiceDesk Premium Tool – Task Manager", Comment: "Should be ON if the ServiceDesk Premium Tool – Task Manager is supported." },
+            { Bit: "79", Definition: "ServiceDesk Premium Tool – Service Manager", Comment: "Should be ON if the ServiceDesk Premium Tool – Registry Editor is supported." },
+            { Bit: "80", Definition: "ServiceDesk Premium Tool – Registry Editor", Comment: "Should be ON if the ServiceDesk Premium Tool – Device Manager is supported." },
+            { Bit: "81", Definition: "ServiceDesk Premium Tool – Device Manager", Comment: "Should be ON if the ServiceDesk Premium Tool Session is supported." },
+            { Bit: "82", Definition: "ServiceDesk Premium Tool – Reserved", Comment: "Should be ON if the ServiceDesk Premium Tool – Reserved is supported." },
+            { Bit: "83", Definition: "ServiceDesk Premium Tool – Reserved", Comment: "Should be ON if the ServiceDesk Premium Tool – Reserved is supported." },
+            { Bit: "84", Definition: "ServiceDesk Premium Tool – Reserved", Comment: "Should be ON if the ServiceDesk Premium Tool – Reserved is supported." },
+            { Bit: "85", Definition: "ServiceDesk Premium Tool – Reserved", Comment: "Should be ON if the ServiceDesk Premium Tool – Reserved is supported." },
+            { Bit: "86", Definition: "Enforce WebSocket Relay", Comment: "Should be ON if the Enforce WebSocket Relay is supported." },
+            { Bit: "87", Definition: "ServiceDesk Survey", Comment: "Should be ON if the ServiceDesk Survey is supported." },
+            { Bit: "88", Definition: "Users on multiple STB teams", Comment: "Should be ON if the users on multiple STB teams is supported." },
+            { Bit: "89", Definition: "Device Mass Storage", Comment: "Should be ON if the Device Mass Storage is supported." },
+            { Bit: "90", Definition: "Session Disconnect", Comment: "Should be ON if the Session Disconnect is supported." },
+            { Bit: "91", Definition: "Password Rotation", Comment: "Should be ON if the password reset command is supported." },
+            { Bit: "92", Definition: "Pop-up Message", Comment: "Should be ON if the pop-up message command is supported." },
+            { Bit: "93", Definition: "SOS invitation management", Comment: "Should be ON if the SOS invitation management is supported." },
+            { Bit: "94", Definition: "Mesh Relay", Comment: "Should be ON if the mesh relay is supported." },
+            { Bit: "95", Definition: "Report the QUIC session type", Comment: "Should be ON if the QUIC session type is supported." }
+        ];
+
+        const policyData = [
+            { Bit: "1", Definition: "Setting Refresh", Comment: "No specific change. Just ask the endpoint to check whether its policy setting is up-to-date." },
+            { Bit: "2", Definition: "Device Name Change", Comment: "Indicate that the name of the endpoint just gets changed in the backend." },
+            { Bit: "3", Definition: "Share Mode Change", Comment: "Indicate that the share mode of the SRS just gets changed in the backend." },
+            { Bit: "4", Definition: "Meeting Mode Change (Splashtop Classroom)", Comment: "Indicate that the meeting mode of the SRS just gets changed in the backend." },
+            { Bit: "5", Definition: "Upload Log Files", Comment: "Indicate that the streamer is asked to upload its log files." },
+            { Bit: "6", Definition: "Multiple Relay Mode Change", Comment: "Indicate that the multiple relay mode of the SRS just gets changed in the backend." },
+            { Bit: "7", Definition: "Inventory Update Change", Comment: "Indicate that the inventory update mode for the SRS just gets changed in the backend." },
+            { Bit: "8", Definition: "Report System Updates Status", Comment: "Indicate that the SRS is asked to report its latest system updates status." },
+            { Bit: "9", Definition: "Change System Updates Policy", Comment: "Indicate that the SRS is asked to change its system update policy." },
+            { Bit: "10", Definition: "Install System Updates", Comment: "Indicate that the SRS is asked to install some system updates." },
+            { Bit: "11", Definition: "Change System Alert Policy", Comment: "Indicate that the SRS is asked to change its system alert policy." },
+            { Bit: "12", Definition: "Force disconnection", Comment: "Indicate that the SRS is asked to close its current sessions immediately." },
+            { Bit: "13", Definition: "Report Event Log", Comment: "Indicate that the SRS is asked to report its event logs based on the given conditions." },
+            { Bit: "14", Definition: "Force Upgrade", Comment: "Indicate that the SRS is asked to proceed an auto upgrade immediately." },
+            { Bit: "15", Definition: "Bitdefender", Comment: "Indicate that the SRS is asked to proceed a Bitdefender installation or uninstallation." },
+            { Bit: "16", Definition: "Scheduled reboot", Comment: "Indicate that the SRS is asked to change its scheduled reboot policy." },
+            { Bit: "17", Definition: "Update antivirus status", Comment: "Indicate that the SRS is asked to report its latest antivirus status." },
+            { Bit: "18", Definition: "Scheduled update", Comment: "Indicate that the SRS is asked to change its scheduled update policy." },
+            { Bit: "19", Definition: "Process antivirus actions", Comment: "Indicate that the SRS is asked to do some antivirus actions." },
+            { Bit: "20", Definition: "Action update", Comment: "Indicate that the SRS is asked to do an action-triggered Windows Updates." },
+            { Bit: "21", Definition: "Action remote command", Comment: "Indicate that the SRS is asked to do an action-triggered Remote Command." },
+            { Bit: "22", Definition: "Action executable", Comment: "Indicate that the SRS is asked to do an action-triggered Executable file." },
+            { Bit: "23", Definition: "Action remote command for Mac", Comment: "Indicate that the Mac SRS is asked to do an action-triggered Remote Command." },
+            { Bit: "24", Definition: "Action executable for Mac", Comment: "Indicate that the Mac SRS is asked to do an action-triggered Executable file." },
+            { Bit: "25", Definition: "Action executable for Windows (MSI)", Comment: "Indicate that the Windows SRS is asked to do an action-triggered MSI file." },
+            { Bit: "26", Definition: "Action file dispatch for Windows", Comment: "Indicate that the Windows SRS is asked to do an action-triggered file dispatch." },
+            { Bit: "27", Definition: "Action file dispatch for Mac", Comment: "Indicate that the Mac SRS is asked to do an action-triggered file dispatch." },
+            { Bit: "28", Definition: "Remote wake-up", Comment: "Indicate that the SRS is asked to wake up certain computers." },
+            { Bit: "29", Definition: "Reboot", Comment: "Indicate that the SRS is asked to reboot the computer." },
+            { Bit: "30", Definition: "Reboot", Comment: "Indicate that the SRS is asked to reboot the computer." },
+            { Bit: "31", Definition: "Reboot", Comment: "Indicate that the SRS is asked to reboot the computer." },
+            { Bit: "32", Definition: "Action Reboot", Comment: "Indicate that the SRS is asked to reboot the computer by an action run-now." },
+            { Bit: "33", Definition: "Action file dispatch for Android", Comment: "Indicate that the Android SRS is asked to do an action-triggered file dispatch." },
+            { Bit: "34", Definition: "Update infrastructure generation status", Comment: "Indicate that the SRS is asked to update its infra_gen_status and do the probe again if needed." },
+            { Bit: "35", Definition: "Update Notification", Comment: "Indicate that the SRS is asked to update its notification messages." },
+            { Bit: "36", Definition: "Update Tracked Vulnerability", Comment: "Indicate that the SRS is asked to update its tracked vulnerability items." },
+            { Bit: "37", Definition: "Request Permission", Comment: "Indicate that some Service Desk permission is required." },
+            { Bit: "38", Definition: "Support Session Info Change", Comment: "Indicate that there are some changes with the support session info." },
+            { Bit: "39", Definition: "Reset Relay", Comment: "Indicate that the SRS is asked to reset all its inactive relay sessions." },
+            { Bit: "40", Definition: "Update Preference Policy", Comment: "Indicate that the SRS is asked to update its preference policy." },
+            { Bit: "41", Definition: "Action executable for Android (APK)", Comment: "Indicate that the Android SRS is asked to do an action-triggered APK file." },
+            { Bit: "42", Definition: "BitDefender2 Installation", Comment: "Indicate that the SRS is asked to install BitDefender v2. (on-prem)" },
+            { Bit: "43", Definition: "BitDefender2 Uninstallation", Comment: "Indicate that the SRS is asked to uninstall BitDefender v2. (on-prem)" },
+            { Bit: "44", Definition: "Update BitDefender2 Policy", Comment: "Indicate that the SRS is asked to update the policy of its BitDefender v2. (on-prem)" },
+            { Bit: "45", Definition: "Enable BitDefender2", Comment: "Indicate that the SRS is asked to activate its BitDefender v2." },
+            { Bit: "46", Definition: "Action file dispatch for Linux", Comment: "Indicate that the Linux SRS is asked to do an action-triggered file dispatch." },
+            { Bit: "47", Definition: "Action executable for Linux", Comment: "Indicate that the Windows SRS is asked to do an action-triggered executable file." },
+            { Bit: "48", Definition: "Action remote command for Android", Comment: "Indicate that the Android SRS is asked to do an action-triggered Remote Command." },
+            { Bit: "49", Definition: "Redeploy", Comment: "Indicate that the streamer is requested to reset its current settings/status and deploys again via the given d-code." },
+            { Bit: "50", Definition: "Disconnect Sessions", Comment: "Indicate that the streamer is requested to disconnect some current sessions." },
+            { Bit: "51", Definition: "Update Streamer Policy", Comment: "Indicate that the streamer is requested to check its streamer policy settings." },
+            { Bit: "52", Definition: "Update OS Patch Policy", Comment: "Indicate that the streamer is requested to check its OS patch policy settings." },
+            { Bit: "53", Definition: "Update Software Patch Policy", Comment: "Indicate that the streamer is requested to check its software patch policy settings." },
+            { Bit: "54", Definition: "Update Antivirus Policy", Comment: "Indicate that the streamer is requested to check its antivirus policy settings." },
+            { Bit: "55", Definition: "Update Alert Policy", Comment: "Indicate that the streamer is requested to check its alert policy settings." },
+            { Bit: "56", Definition: "Update Scripting Policy", Comment: "Indicate that the streamer is requested to check its scripting policy settings." },
+            { Bit: "57", Definition: "Update Patch OP", Comment: "Indicate that the streamer is requested to check an OP of it and do relevant actions." },
+            { Bit: "58", Definition: "Enable EMM Policy", Comment: "Indicate that the streamer is requested to enable/disable its emm policies." },
+            { Bit: "59", Definition: "Action Mac update", Comment: "Indicate that the SRS is asked to do an action-triggered Mac Updates." },
+            { Bit: "60", Definition: "Update secure WiFi Certificate", Comment: "Indicate that the requested secure WiFi certificate is available for the Windows streamer to retrieve." },
+            { Bit: "61", Definition: "Update secure WiFi mobile config", Comment: "Indicate that the requested secure WiFi mobile config is available for the Mac streamer to retrieve." }
+        ];
+
+        // Validating hex string
+        function isValidHex(hex) {
+            return /^[0-9A-Fa-f]+$/.test(hex);
+        }
+
+        // Converting hex to binary string (standard order, with spaces every 4 bits from the left)
+        function hexToBinary(hex) {
+            let binary = '';
+            for (let i = 0; i < hex.length; i++) {
+                const bin = parseInt(hex[i], 16).toString(2).padStart(4, '0');
+                binary += bin;
+            }
+            const cleanBinary = binary;
+            let formattedBinary = '';
+            for (let i = 0; i < binary.length; i++) {
+                if (i > 0 && i % 4 === 0) {
+                    formattedBinary += ' ';
+                }
+                formattedBinary += binary[i];
+            }
+            return { cleanBinary, formattedBinary };
+        }
+
+        // Getting bit value at position (1-based index from the right)
+        function getBitValue(cleanBinary, position) {
+            const length = cleanBinary.length;
+            if (position > length) {
+                return '-';
+            }
+            return cleanBinary[length - position];
+        }
+
+        // Finding definition and comment for bit position
+        function findDefinitionAndComment(bitPosition, bitmapType) {
+            let data;
+            switch (bitmapType) {
+                case 'srs':
+                    data = srsData;
+                    break;
+                case 'src':
+                    data = srcData;
+                    break;
+                case 'policy':
+                    data = policyData;
+                    break;
+                default:
+                    return { definition: 'No Definition', comment: 'No Comment' };
+            }
+            const entry = data.find(row => parseInt(row.Bit) === bitPosition);
+            return entry ? { definition: entry.Definition, comment: entry.Comment || 'No Comment' } : { definition: 'No Definition', comment: 'No Comment' };
+        }
+
+        // Updating result display
+        function updateResult() {
+            const hexInput = document.getElementById('hexInput').value.trim();
+            const bitPosition = document.getElementById('bitPosition').value;
+            const bitmapType = document.getElementById('bitmapSelect').value;
+            const hexError = document.getElementById('hexError');
+            const bitError = document.getElementById('bitError');
+            const result = document.getElementById('result');
+            const bitValue = document.getElementById('bitValue');
+            const definition = document.getElementById('definition');
+            const comment = document.getElementById('comment');
+            const fullBinaryString = document.getElementById('fullBinaryString');
+
+            // Reset error and result visibility
+            hexError.classList.add('hidden');
+            bitError.classList.add('hidden');
+            result.classList.add('hidden');
+
+            // Skip processing if hex input is empty
+            if (!hexInput) {
+                return;
+            }
+
+            // Validate hex string
+            if (!isValidHex(hexInput)) {
+                hexError.classList.remove('hidden');
+                return;
+            }
+
+            // Convert hex to binary
+            const { cleanBinary, formattedBinary } = hexToBinary(hexInput);
+
+            // If bit position is provided, validate and process
+            let bit = '-';
+            let bitPosNum = 0;
+            if (bitPosition) {
+                bitPosNum = Number(bitPosition);
+                if (!Number.isInteger(bitPosNum) || bitPosNum <= 0) {
+                    bitError.classList.remove('hidden');
+                    return;
+                }
+                bit = getBitValue(cleanBinary, bitPosNum);
+            }
+
+            // Get definition and comment
+            const { definition: def, comment: comm } = findDefinitionAndComment(bitPosNum, bitmapType);
+
+            // Display results
+            bitValue.textContent = bitPosition ? `Bit ${bitPosNum} | Value: ${bit}` : '';
+            definition.textContent = bitPosition ? `Definition: ${def}` : '';
+            comment.textContent = bitPosition ? `Comment: ${comm}` : '';
+            fullBinaryString.textContent = `Full Binary: ${formattedBinary}`;
+            result.classList.remove('hidden');
+        }
+
+        // Add event listeners for real-time updates
+        document.getElementById('hexInput').addEventListener('input', updateResult);
+        document.getElementById('bitPosition').addEventListener('input', updateResult);
+        document.getElementById('bitmapSelect').addEventListener('change', updateResult);
+    </script>
+</body>
+</html>
