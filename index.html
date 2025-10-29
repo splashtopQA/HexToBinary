@@ -37,7 +37,8 @@
         }
         return gk_fileData[filename] || "";
         }
-        </script><!DOCTYPE html>
+</script>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -45,48 +46,107 @@
     <title>Bit Map Analyzer</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen">
-    <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
-        <h1 class="text-2xl font-bold mb-6 text-center">Bit Map Analyzer</h1>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+    <div class="bg-white p-6 md:p-8 rounded-lg shadow-lg w-full max-w-6xl flex flex-col lg:flex-row gap-6">
         
-        <!-- Input for Hex String -->
-        <div class="mb-4">
-            <label for="hexInput" class="block text-sm font-medium text-gray-700">Hex String</label>
-            <input type="text" id="hexInput" class="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter hex string">
-            <p id="hexError" class="text-red-500 text-sm mt-1 hidden">Invalid hex string</p>
+        <!-- 左側：輸入與結果（固定最大寬度，內部可捲動） -->
+        <div class="flex-1 max-w-full lg:max-w-2xl space-y-6">
+            <h1 class="text-2xl font-bold text-center">Bit Map Analyzer</h1>
+
+            <!-- Input for Hex String -->
+            <div>
+                <label for="hexInput" class="block text-sm font-medium text-gray-700 mb-1">Hex String</label>
+                <input type="text" id="hexInput" 
+                       class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                       placeholder="Enter hex string">
+                <p id="hexError" class="text-red-500 text-sm mt-1 hidden">Invalid hex string</p>
+            </div>
+            
+            <!-- Input for Bit Position -->
+            <div>
+                <label for="bitPosition" class="block text-sm font-medium text-gray-700 mb-1">Bit Position</label>
+                <input type="number" id="bitPosition" 
+                       class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                       placeholder="Enter bit position" min="1">
+                <p id="bitError" class="text-red-500 text-sm mt-1 hidden">Please enter a positive integer</p>
+            </div>
+            
+            <!-- Dropdown for Bitmap Selection -->
+            <div>
+                <label for="bitmapSelect" class="block text-sm font-medium text-gray-700 mb-1">Bitmap Type</label>
+                <select id="bitmapSelect" class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="none">None</option>
+                    <option value="srs">SRS Capability Bit-Map</option>
+                    <option value="src">SRC Capability Bit-Map</option>
+                    <option value="policy">Flag Mask Of Policy Change</option>
+                </select>
+            </div>
+            
+            <!-- Result Display -->
+            <div id="result" class="p-5 bg-gradient-to-br from-blue-50 to-white rounded-lg shadow-md border border-blue-200 hidden space-y-4">
+                <!-- Full Binary -->
+                <div>
+                    <p class="text-xs font-semibold text-blue-700 uppercase tracking-wider">完整二進位</p>
+                    <div class="mt-1 p-2 bg-gray-100 rounded overflow-x-auto border border-gray-300">
+                        <p id="fullBinaryString" class="font-mono text-sm whitespace-nowrap"></p>
+                    </div>
+                </div>
+
+                <!-- Bit Value -->
+                <div>
+                    <p class="text-xs font-semibold text-blue-700 uppercase tracking-wider">位元值</p>
+                    <p id="bitValue" class="text-lg font-bold text-blue-900"></p>
+                </div>
+
+                <!-- Definition -->
+                <div>
+                    <p class="text-xs font-semibold text-blue-700 uppercase tracking-wider">功能定義</p>
+                    <p id="definition" class="text-sm text-gray-800 leading-relaxed"></p>
+                </div>
+
+                <!-- Comment -->
+                <div>
+                    <p class="text-xs font-semibold text-blue-700 uppercase tracking-wider">備註說明</p>
+                    <p id="comment" class="text-sm text-gray-600 italic leading-relaxed"></p>
+                </div>
+            </div>
         </div>
-        
-        <!-- Input for Bit Position -->
-        <div class="mb-4">
-            <label for="bitPosition" class="block text-sm font-medium text-gray-700">Bit Position</label>
-            <input type="number" id="bitPosition" class="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter bit position" min="1">
-            <p id="bitError" class="text-red-500 text-sm mt-1 hidden">Please enter a positive integer</p>
-        </div>
-        
-        <!-- Dropdown for Bitmap Selection -->
-        <div class="mb-4">
-            <label for="bitmapSelect" class="block text-sm font-medium text-gray-700">Bitmap Type</label>
-            <select id="bitmapSelect" class="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="none">None</option>
-                <option value="srs">SRS Capability Bit-Map</option>
-                <option value="src">SRC Capability Bit-Map</option>
-                <option value="policy">Flag Mask Of Policy Change</option>
-            </select>
-        </div>
-        
-        <!-- Result Display -->
-        <div id="result" class="mt-6 p-4 bg-blue-100 rounded-md hidden">
-            <p id="fullBinaryString" class="text-sm mt-2 overflow-auto whitespace-nowrap"></p>
-            <br>
-            <p id="bitValue" class="text-sm font-medium mt-2"></p>
-            <br>
-            <p id="definition" class="text-sm mt-2"></p>
-            <p id="comment" class="text-sm mt-2"></p>
+
+        <!-- 右側：更新日期與功能說明（固定寬度） -->
+        <div class="lg:w-80 space-y-6 flex-shrink-0">
+            
+            <!-- 功能說明區塊 -->
+            <div class="bg-blue-50 border border-blue-200 rounded-md p-4 text-sm text-gray-700">
+                <p class="font-semibold text-blue-900 mb-1">功能說明</p>
+                <ul class="list-disc list-inside space-y-1 text-gray-600">
+                    <li>輸入 <strong>Hex 字串</strong>（如：FF00A5）</li>
+                    <li>輸入 <strong>Bit 位置</strong>（從右邊第 1 位開始）</li>
+                    <li>選擇 <strong>Bitmap 類型</strong>（SRS / SRC / Policy）</li>
+                    <li>即時顯示該位元的 <strong>值、定義與說明</strong></li>
+                    <li>支援完整二進位顯示（每 4 位一組）</li>
+                </ul>	
+				<div class="mt-3 text-xs text-gray-500 space-y-1">
+					<p>定義來源: 
+						<a href="https://splashtop.sharepoint.com/:b:/s/STB/EYPVffysLcpFg3MSvVJ--tsBZkbOwGNrjEO2I_lRdkBgtQ?e=4urHvW" 
+						   target="_blank" 
+						   class="text-blue-600 hover:text-blue-800 underline font-medium">
+							Splashtop_Fulong_API-V3.pdf
+						</a>
+					</p>
+					<p> - 2.7 FLAG MASK OF POLICY CHANGE (68 bits)</p>
+					<p> - 2.14 SRS CAPABILITY BIT-MAP (181 bits)</p>
+					<p> - 2.17 SRC CAPABILITY BIT-MAP (100 bits)</p>
+				</div>				
+            </div>
+			
+			<!-- 更新日期區塊 -->
+            <div class="text-center text-gray-500 text-sm">
+                最後更新日期：2025年10月29日 by Steve
+            </div>
         </div>
     </div>
 
     <script>
-        // Embedded CSV data
         const srsData = [
             { Bit: "1", Definition: "File transfer", Comment: "Should be ON for SRS has the capability to do file transfer. No matter if the backend allow the SRS to use it or not." },
             { Bit: "2", Definition: "1-to-many streaming", Comment: "Should be ON for SRS has the capability to do 1-to-many streaming. No matter if the backend allow the SRS to use it or not." },
@@ -260,7 +320,12 @@
             { Bit: "173", Definition: "EMM XXX Policy for Android (Reserved)", Comment: "" },
             { Bit: "174", Definition: "EMM XXX Policy for Android (Reserved)", Comment: "" },
             { Bit: "175", Definition: "EMM XXX Policy for Android (Reserved)", Comment: "" },
-            { Bit: "176", Definition: "EMM XXX Policy for Android (Reserved)", Comment: "" }
+            { Bit: "176", Definition: "EMM XXX Policy for Android (Reserved)", Comment: "" },
+            { Bit: "177", Definition: "Manageable OSC in Background Sessions", Comment: "Should be ON if the Manageable OSC for Background Sessions is supported." },
+            { Bit: "178", Definition: "CrowdStrike Integration", Comment: "Should be ON if the CrowdStrike integration is supported." },
+            { Bit: "179", Definition: "Disk Encryption", Comment: "Should be ON if the Disk Encryption is supported." },
+            { Bit: "180", Definition: "DPI Option for RDP Sessions", Comment: "Should be ON if the DPI Option for RDP Sessions is supported." },
+            { Bit: "181", Definition: "Device Posture Check – Osquery for Windows", Comment: "Should be ON if the Windows Device Posture Check via osquery is supported by the streamer." }
         ];
 
         const srcData = [
@@ -358,7 +423,12 @@
             { Bit: "92", Definition: "Pop-up Message", Comment: "Should be ON if the pop-up message command is supported." },
             { Bit: "93", Definition: "SOS invitation management", Comment: "Should be ON if the SOS invitation management is supported." },
             { Bit: "94", Definition: "Mesh Relay", Comment: "Should be ON if the mesh relay is supported." },
-            { Bit: "95", Definition: "Report the QUIC session type", Comment: "Should be ON if the QUIC session type is supported." }
+            { Bit: "95", Definition: "Report the QUIC session type", Comment: "Should be ON if the QUIC session type is supported." },
+            { Bit: "96", Definition: "Remote Command V2", Comment: "Should be ON if the Remote Command V2 is supported." },
+            { Bit: "97", Definition: "Reconnection", Comment: "Should be ON if the reconnect command (in the response of the service:GET) is supported." },
+            { Bit: "98", Definition: "Manageable OSC in Background Sessions", Comment: "Should be ON if the Manageable OSC for Background Sessions is supported." },
+            { Bit: "99", Definition: "Conditional Access Control (on-prem)", Comment: "Should be ON if the Conditional Access Control (on-prem) is supported." },
+            { Bit: "100", Definition: "Script Task – Computer Selection", Comment: "Should be ON if the Script Task – Computer Selection is supported." }
         ];
 
         const policyData = [
@@ -421,8 +491,15 @@
             { Bit: "57", Definition: "Update Patch OP", Comment: "Indicate that the streamer is requested to check an OP of it and do relevant actions." },
             { Bit: "58", Definition: "Enable EMM Policy", Comment: "Indicate that the streamer is requested to enable/disable its emm policies." },
             { Bit: "59", Definition: "Action Mac update", Comment: "Indicate that the SRS is asked to do an action-triggered Mac Updates." },
-            { Bit: "60", Definition: "Update secure WiFi Certificate", Comment: "Indicate that the requested secure WiFi certificate is available for the Windows streamer to retrieve." },
-            { Bit: "61", Definition: "Update secure WiFi mobile config", Comment: "Indicate that the requested secure WiFi mobile config is available for the Mac streamer to retrieve." }
+            { Bit: "60", Definition: "Install OS Ops", Comment: "Indicate that the SRS is asked to do an OS patch update." },
+            { Bit: "61", Definition: "Update Posture Check", Comment: "Indicate that the SRS is asked to do an device posture." },
+            { Bit: "62", Definition: "Change UUID", Comment: "Indicate that the SRS is asked to generate a new SW UUID." },
+            { Bit: "63", Definition: "Update secure WiFi Certificate", Comment: "Indicate that the requested secure WiFi certificate is available for the Windows streamer to retrieve." },
+            { Bit: "64", Definition: "Update secure WiFi mobile config", Comment: "Indicate that the requested secure WiFi mobile config is available for the Mac streamer to retrieve." },
+            { Bit: "65", Definition: "Update Config Policy", Comment: "Indicate that the streamer is requested to check its configuration management policy settings." },
+            { Bit: "66", Definition: "Check Credential", Comment: "Indicate that the streamer is requested to do a credential verification." },
+            { Bit: "67", Definition: "CrowdStrike", Comment: "Indicate that the SRS is asked to proceed a CrowdStrike installation or uninstallation." },
+            { Bit: "68", Definition: "Disk Encryption", Comment: "Indicate that the SRS is asked to proceed a disk encryption." }
         ];
 
         // Validating hex string
@@ -525,10 +602,10 @@
             const { definition: def, comment: comm } = findDefinitionAndComment(bitPosNum, bitmapType);
 
             // Display results
-            bitValue.textContent = bitPosition ? `Bit ${bitPosNum} | Value: ${bit}` : '';
-            definition.textContent = bitPosition ? `Definition: ${def}` : '';
-            comment.textContent = bitPosition ? `Comment: ${comm}` : '';
-            fullBinaryString.textContent = `Full Binary: ${formattedBinary}`;
+			bitValue.textContent = bitPosition ? `第 ${bitPosNum} 位：${bit === '1' ? '1' : bit === '0' ? '0' : 'N/A'}` : '';
+			definition.textContent = bitPosition ? def : '';
+			comment.textContent = bitPosition ? (comm !== 'No Comment' ? comm : '無額外說明') : '';
+			fullBinaryString.textContent = formattedBinary;
             result.classList.remove('hidden');
         }
 
