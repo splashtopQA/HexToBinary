@@ -134,14 +134,14 @@
 						</a>
 					</p>
 					<p> - 2.7 FLAG MASK OF POLICY CHANGE (68 bits)</p>
-					<p> - 2.14 SRS CAPABILITY BIT-MAP (181 bits)</p>
-					<p> - 2.17 SRC CAPABILITY BIT-MAP (100 bits)</p>
+					<p> - 2.14 SRS CAPABILITY BIT-MAP (184 bits)</p>
+					<p> - 2.17 SRC CAPABILITY BIT-MAP (102 bits)</p>
 				</div>				
             </div>
 			
 			<!-- 更新日期區塊 -->
             <div class="text-center text-gray-500 text-sm">
-                最後更新日期：2025年10月29日 by Steve
+                最後更新日期：2025年12月15日 by Steve
             </div>
         </div>
     </div>
@@ -325,7 +325,10 @@
             { Bit: "178", Definition: "CrowdStrike Integration", Comment: "Should be ON if the CrowdStrike integration is supported." },
             { Bit: "179", Definition: "Disk Encryption", Comment: "Should be ON if the Disk Encryption is supported." },
             { Bit: "180", Definition: "DPI Option for RDP Sessions", Comment: "Should be ON if the DPI Option for RDP Sessions is supported." },
-            { Bit: "181", Definition: "Device Posture Check – Osquery for Windows", Comment: "Should be ON if the Windows Device Posture Check via osquery is supported by the streamer." }
+            { Bit: "181", Definition: "Device Posture Check – Osquery for Windows", Comment: "Should be ON if the Windows Device Posture Check via osquery is supported by the streamer." },
+			{ Bit: "182", Definition: "SFTP Session", Comment: "Should be ON if the SFTP Session is supported." },
+			{ Bit: "183", Definition: "Remote Print Logs", Comment: "Should be ON if the Remote Print Logs is supported." },
+			{ Bit: "184", Definition: "Splashtop Endpoint Verification", Comment: "Should be ON if the Splashtop Endpoint Verification is supported." }
         ];
 
         const srcData = [
@@ -428,7 +431,9 @@
             { Bit: "97", Definition: "Reconnection", Comment: "Should be ON if the reconnect command (in the response of the service:GET) is supported." },
             { Bit: "98", Definition: "Manageable OSC in Background Sessions", Comment: "Should be ON if the Manageable OSC for Background Sessions is supported." },
             { Bit: "99", Definition: "Conditional Access Control (on-prem)", Comment: "Should be ON if the Conditional Access Control (on-prem) is supported." },
-            { Bit: "100", Definition: "Script Task – Computer Selection", Comment: "Should be ON if the Script Task – Computer Selection is supported." }
+            { Bit: "100", Definition: "Script Task – Computer Selection", Comment: "Should be ON if the Script Task – Computer Selection is supported." },
+			{ Bit: "101", Definition: "SFTP Session", Comment: "Should be ON if the SFTP Session is supported." },
+			{ Bit: "102", Definition: "Email-based 2FA", Comment: "Should be ON if the Email-based 2FA is supported." }
         ];
 
         const policyData = [
