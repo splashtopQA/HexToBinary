@@ -133,15 +133,15 @@
 							Splashtop_Fulong_API-V3.pdf
 						</a>
 					</p>
-					<p> - 2.7 FLAG MASK OF POLICY CHANGE (68 bits)</p>
-					<p> - 2.14 SRS CAPABILITY BIT-MAP (185 bits)</p>
+					<p> - 2.7 FLAG MASK OF POLICY CHANGE (70 bits)</p>
+					<p> - 2.14 SRS CAPABILITY BIT-MAP (186 bits)</p>
 					<p> - 2.17 SRC CAPABILITY BIT-MAP (102 bits)</p>
 				</div>				
             </div>
 			
 			<!-- 更新日期區塊 -->
             <div class="text-center text-gray-500 text-sm">
-                最後更新日期：2026年01月05日 by Steve
+                最後更新日期：2026年02月13日 by Steve
             </div>
         </div>
     </div>
@@ -329,7 +329,8 @@
 			{ Bit: "182", Definition: "SFTP Session", Comment: "Should be ON if the SFTP Session is supported." },
 			{ Bit: "183", Definition: "Remote Print Logs", Comment: "Should be ON if the Remote Print Logs is supported." },
 			{ Bit: "184", Definition: "Splashtop Endpoint Verification", Comment: "Should be ON if the Splashtop Endpoint Verification is supported." },
-			{ Bit: "185", Definition: "EMM Access Guard Policy for Windows", Comment: "Should be ON if the EMM Access Guard Policy for Windows is supported." }
+			{ Bit: "185", Definition: "EMM Access Guard Policy for Windows", Comment: "Should be ON if the EMM Access Guard Policy for Windows is supported." },
+			{ Bit: "186", Definition: "SentinelOne Integration", Comment: "Should be ON if the SentinelOne integration is supported." }
         ];
 
         const srcData = [
@@ -505,7 +506,9 @@
             { Bit: "65", Definition: "Update Config Policy", Comment: "Indicate that the streamer is requested to check its configuration management policy settings." },
             { Bit: "66", Definition: "Check Credential", Comment: "Indicate that the streamer is requested to do a credential verification." },
             { Bit: "67", Definition: "CrowdStrike", Comment: "Indicate that the SRS is asked to proceed a CrowdStrike installation or uninstallation." },
-            { Bit: "68", Definition: "Disk Encryption", Comment: "Indicate that the SRS is asked to proceed a disk encryption." }
+            { Bit: "68", Definition: "Disk Encryption", Comment: "Indicate that the SRS is asked to proceed a disk encryption." },
+			{ Bit: "69", Definition: "Update Access Guard Policy", Comment: "Indicate that the streamer is requested to check its access guard policy settings." },
+			{ Bit: "70", Definition: "SentinelOne", Comment: "Indicate that the SRS is asked to proceed a SentinelOne installation or uninstallation." }
         ];
 
         // Validating hex string
